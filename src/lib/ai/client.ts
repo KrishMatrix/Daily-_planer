@@ -292,7 +292,9 @@ async function providerError(res: Response, cfg: AiConfig) {
   const msg =
     res.status === 401
       ? `The AI provider rejected the API key. Check ${cfg.keyVar}.`
-      : res.status === 404 || code === "model_not_found"
+      : res.status === 403
+        ? `Your API key isn't allowed to use "${cfg.model}". Check the key's permissions and the project's model access on platform.openai.com.`
+        : res.status === 404 || code === "model_not_found"
         ? `Model "${cfg.model}" wasn't found. Pick a different model in AI Settings.`
         : res.status === 429
           ? code === "insufficient_quota"
