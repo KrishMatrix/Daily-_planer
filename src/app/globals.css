@@ -1,0 +1,187 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.85rem;
+  --background: oklch(0.985 0.004 264);
+  --foreground: oklch(0.2 0.02 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.02 264);
+  --primary: oklch(0.55 0.2 270);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.01 264);
+  --secondary-foreground: oklch(0.25 0.02 264);
+  --muted: oklch(0.96 0.008 264);
+  --muted-foreground: oklch(0.52 0.02 264);
+  --accent: oklch(0.95 0.025 270);
+  --accent-foreground: oklch(0.3 0.08 270);
+  --destructive: oklch(0.6 0.22 25);
+  --success: oklch(0.62 0.15 155);
+  --warning: oklch(0.75 0.16 70);
+  --border: oklch(0.92 0.008 264);
+  --input: oklch(0.9 0.01 264);
+  --ring: oklch(0.55 0.2 270);
+  --sidebar: oklch(0.975 0.006 264);
+}
+
+.dark {
+  --background: oklch(0.16 0.015 270);
+  --foreground: oklch(0.95 0.005 264);
+  --card: oklch(0.205 0.018 270);
+  --card-foreground: oklch(0.95 0.005 264);
+  --popover: oklch(0.22 0.02 270);
+  --popover-foreground: oklch(0.95 0.005 264);
+  --primary: oklch(0.68 0.17 272);
+  --primary-foreground: oklch(0.15 0.02 270);
+  --secondary: oklch(0.26 0.02 270);
+  --secondary-foreground: oklch(0.92 0.005 264);
+  --muted: oklch(0.25 0.018 270);
+  --muted-foreground: oklch(0.7 0.02 264);
+  --accent: oklch(0.28 0.04 272);
+  --accent-foreground: oklch(0.92 0.03 272);
+  --destructive: oklch(0.65 0.2 25);
+  --success: oklch(0.7 0.15 155);
+  --warning: oklch(0.8 0.15 75);
+  --border: oklch(0.3 0.02 270);
+  --input: oklch(0.32 0.02 270);
+  --ring: oklch(0.68 0.17 272);
+  --sidebar: oklch(0.18 0.016 270);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Safe areas for installed PWA on notched phones */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ── FullCalendar theme ───────────────────────────────── */
+.fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--muted);
+  --fc-today-bg-color: color-mix(in oklch, var(--primary) 7%, transparent);
+  --fc-now-indicator-color: var(--destructive);
+  --fc-event-border-color: transparent;
+  --fc-list-event-hover-bg-color: var(--muted);
+  --fc-highlight-color: color-mix(in oklch, var(--primary) 15%, transparent);
+  font-size: 0.85rem;
+}
+.fc .fc-toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.fc .fc-button {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 4px);
+  font-weight: 500;
+  text-transform: capitalize;
+  box-shadow: none !important;
+  padding: 0.35rem 0.7rem;
+}
+.fc .fc-button:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  text-decoration: none;
+}
+.fc .fc-day-today .fc-daygrid-day-number {
+  color: var(--primary);
+  font-weight: 700;
+}
+.fc .fc-event {
+  border-radius: 6px;
+  padding: 1px 4px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fc .fc-timegrid-slot {
+  height: 2.6em;
+}
+.fc .fc-scrollgrid {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: var(--border);
+}
+.fc .fc-list-day-cushion {
+  background: var(--muted);
+}
+.fc-event.is-done {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+@media (max-width: 640px) {
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+}

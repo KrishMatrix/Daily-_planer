@@ -240,3 +240,4 @@ npm run build       # production build
 - Outdoor activities are detected from the **Outdoor activity** switch on a task, or guessed from words like "run", "hike" or "park". Turn the switch on for anything else outdoors.
 - The backup export (JSON / ICS) is download-only. There is no import screen yet.
 # Daily-_planer
+# Daily-_planer

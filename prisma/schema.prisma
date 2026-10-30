@@ -1,0 +1,334 @@
+// AI Life Planner — database schema
+//
+// Dates & times are stored as *local calendar strings* in the user's timezone
+// ("YYYY-MM-DD" and "HH:mm"). A personal planner thinks in wall-clock time
+// ("gym on Tuesday at 18:00"), so this avoids timezone drift when the same
+// account is used from several devices. The user's IANA timezone lives on
+// User.timezone and is used whenever we need an absolute instant (reminders).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  timezone     String   @default("Europe/Berlin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions          Session[]
+  settings          UserSettings?
+  categories        Category[]
+  tasks             Task[]
+  attachments       Attachment[]
+  semesters         Semester[]
+  subjects          Subject[]
+  lectureNotes      LectureNote[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  aiUsage           AiUsage[]
+  aiProposals       AiProposal[]
+  aiCache           AiCache[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent  String?
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Planning preferences (used by the scheduler and AI)
+  dayStart        String @default("08:00")
+  dayEnd          String @default("22:00")
+  workDays        Int[]  @default([0, 1, 2, 3, 4]) // 0 = Monday … 6 = Sunday
+  workStart       String @default("09:00")
+  workEnd         String @default("17:00")
+  bufferMinutes   Int    @default(15) // break kept between scheduled blocks
+  maxFocusMinutes Int    @default(120) // longest block before a break
+  planningNotes   String @default("") // free text preferences for the AI
+
+  // Notifications
+  defaultReminderMinutes Int     @default(15)
+  classReminders         Boolean @default(true)
+  meetingReminders       Boolean @default(true)
+  deadlineReminders      Boolean @default(true)
+  overdueAlerts          Boolean @default(true)
+  dailyPlanNotification  Boolean @default(true)
+  dailyPlanTime          String  @default("07:30")
+
+  // Weather (Open-Meteo). Location is chosen by the user; GPS is optional.
+  weatherLabel String? // e.g. "Saarbrücken, Saarland, Germany"
+  weatherLat   Float?
+  weatherLon   Float?
+  weatherUnit  String  @default("celsius") // "celsius" | "fahrenheit"
+
+  // AI (the API key itself is NEVER stored here — only server env vars)
+  aiEnabled                Boolean @default(true)
+  aiProvider               String  @default("") // "" = server default (AI_PROVIDER) | "openai" | "compatible"
+  aiModel                  String  @default("") // "" = server default (OPENAI_MODEL / AI_MODEL)
+  inputPricePerMTok        Float   @default(0.25) // USD per 1M input tokens (user-verifiable estimate)
+  cachedInputPricePerMTok  Float   @default(0.025) // USD per 1M cached input tokens
+  outputPricePerMTok       Float   @default(2.0) // USD per 1M output tokens
+  monthlyBudgetUsd   Float   @default(5)
+  confirmAboveUsd    Float   @default(0.02) // ask before a single request estimated above this
+
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String // hex
+  icon      String   @default("circle")
+  key       String? // built-in key: university | work | gym | personal | meetings | other
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  tasks     Task[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskKind {
+  TASK
+  ASSIGNMENT
+  EXAM
+  CLASS
+  MEETING
+  STUDY
+  EVENT
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String    @default("")
+  notes       String    @default("")
+  kind        TaskKind  @default(TASK)
+  priority    Priority  @default(MEDIUM)
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subjectId   String?
+  subject     Subject?  @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  project     String? // e.g. "SEO" for ZeMA work
+  location    String?
+  outdoor     Boolean   @default(false) // used for weather-aware suggestions
+
+  date             String? // scheduled day, YYYY-MM-DD (null = unscheduled inbox)
+  startTime        String? // HH:mm (null = all-day / untimed)
+  endTime          String? // HH:mm
+  deadlineDate     String? // YYYY-MM-DD
+  deadlineTime     String? // HH:mm
+  estimatedMinutes Int?
+
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  // Recurrence: { freq: "DAILY"|"WEEKLY"|"MONTHLY", interval, byWeekday?: number[], until?: "YYYY-MM-DD", count? }
+  recurrence   Json?
+  exDates      String[] @default([]) // occurrence dates removed from / detached from the series
+  seriesId     String? // set on a detached occurrence: the parent recurring task
+  series       Task?    @relation("Series", fields: [seriesId], references: [id], onDelete: Cascade)
+  occurrences  Task[]   @relation("Series")
+  originalDate String? // the occurrence date this detached task replaced
+
+  reminderMinutes Int[] @default([]) // minutes before start (or deadline) to remind
+
+  sortOrder Float    @default(0)
+  version   Int      @default(1) // optimistic concurrency for multi-device edits
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attachments Attachment[]
+
+  @@index([userId, date])
+  @@index([userId, deadlineDate])
+  @@index([seriesId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String
+  size      Int
+  data      Bytes? // small files stored in Postgres (≤ 4 MB)
+  url       String? // or an external link
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model Semester {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  startDate String
+  endDate   String
+  createdAt DateTime  @default(now())
+  subjects  Subject[]
+
+  @@index([userId])
+}
+
+model Subject {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  semesterId String?
+  semester   Semester?     @relation(fields: [semesterId], references: [id], onDelete: SetNull)
+  name       String
+  code       String        @default("")
+  instructor String        @default("")
+  color      String        @default("#6366f1")
+  createdAt  DateTime      @default(now())
+  tasks      Task[]
+  notes      LectureNote[]
+
+  @@index([userId])
+}
+
+model LectureNote {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  title     String
+  content   String   @default("")
+  date      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // CLASS | MEETING | DEADLINE | OVERDUE | DAILY_PLAN | REMINDER | SYSTEM
+  title     String
+  body      String   @default("")
+  url       String?
+  taskId    String?
+  dedupeKey String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, read, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AiUsage {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature          String
+  model            String
+  promptTokens     Int
+  cachedTokens     Int      @default(0)
+  completionTokens Int
+  costUsd          Float
+  createdAt        DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model AiProposal {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  summary    String
+  actions    Json
+  status     ProposalStatus @default(PENDING)
+  result     Json?
+  createdAt  DateTime       @default(now())
+  resolvedAt DateTime?
+
+  @@index([userId, status])
+}
+
+/// Cached AI answers keyed by a hash of the exact (compact) input, so an
+/// unchanged schedule never pays for the same analysis twice.
+model AiCache {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature   String
+  key       String
+  response  Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@unique([userId, key])
+  @@index([expiresAt])
+}
+
+/// Shared forecast cache (weather isn't user data). Key = rounded coords + unit + timezone.
+model WeatherCache {
+  key       String   @id
+  data      Json
+  fetchedAt DateTime
+}
+
+model RateLimit {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+}
